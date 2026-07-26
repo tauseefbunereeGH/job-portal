@@ -1,56 +1,75 @@
-const User=require("../models/User");
-const bcrypt=require("bcryptjs");
-const generateToken=require("../utils/generateToken");
+const User = require("../models/User");
+const bcrypt = require("bcryptjs");
+const generateToken = require("../utils/generateToken");
 
-const registerUser=async(req,res)=>{
+// Register User
+const registerUser = async (req, res) => {
+    const { name, email, password } = req.body;
 
-const {name,email,password}=req.body;
+    const userExists = await User.findOne({ email });
 
-const userExists=await User.findOne({email});
+    if (userExists) {
+        return res.status(400).json({
+            message: "User already exists"
+        });
+    }
 
-if(userExists){
+    const salt = await bcrypt.genSalt(10);
 
-return res.status(400).json({
-message:"User already exists"
-});
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-}
+    const user = await User.create({
+        name,
+        email,
+        password: hashedPassword
+    });
 
-const salt=await bcrypt.genSalt(10);
+    if (user) {
+        res.status(201).json({
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            token: generateToken(user._id)
+        });
+    } else {
+        res.status(400).json({
+            message: "Invalid user data"
+        });
+    }
+};
 
-const hashedPassword=await bcrypt.hash(password,salt);
+// Login User
+const loginUser = async (req, res) => {
 
-const user=await User.create({
+    const { email, password } = req.body;
 
-name,
-email,
-password:hashedPassword
+    const user = await User.findOne({ email });
 
-});
+    if (
+        user &&
+        (await bcrypt.compare(password, user.password))
+    ) {
 
-if(user){
+        res.json({
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            token: generateToken(user._id)
+        });
 
-res.status(201).json({
+    } else {
 
-_id:user._id,
-name:user.name,
-email:user.email,
-token:generateToken(user._id)
+        res.status(401).json({
+            message: "Invalid email or password"
+        });
 
-});
-
-}else{
-
-res.status(400).json({
-
-message:"Invalid User Data"
-
-});
-
-}
+    }
 
 };
 
-module.exports={
-registerUser
+module.exports = {
+    registerUser,
+    loginUser
 };
